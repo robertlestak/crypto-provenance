@@ -498,13 +498,25 @@ func handleNewProvenance(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	var res struct {
+		Status      string `json:"status,omitempty"`
+		FileName    string `json:"fileName,omitempty"`
+		QueueLength int    `json:"queueLength,omitempty"`
+		Error       string `json:"error,omitempty"`
+	}
 	if network == "" {
 		l.Error("network is required")
-		os.Exit(1)
+		res.Status = "error"
+		res.Error = "network is required"
+		json.NewEncoder(w).Encode(res)
+		return
 	}
 	if rootAddress == "" {
 		l.Error("rootAddress is required")
-		os.Exit(1)
+		res.Status = "error"
+		res.Error = "rootAddress is required"
+		json.NewEncoder(w).Encode(res)
+		return
 	}
 	p := schema.Provenance{
 		Network:     network,
@@ -514,17 +526,13 @@ func handleNewProvenance(w http.ResponseWriter, r *http.Request) {
 	}
 	pendingQueue = append(pendingQueue, p)
 	fn := fmt.Sprintf("%s_%s.csv", network, rootAddress)
-	var res struct {
-		Status      string `json:"status"`
-		FileName    string `json:"fileName"`
-		QueueLength int    `json:"queueLength"`
-	}
 	res.Status = "pending"
 	res.FileName = fn
 	res.QueueLength = len(pendingQueue)
 	jd, err := json.Marshal(res)
 	if err != nil {
 		l.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
