@@ -497,6 +497,8 @@ func handleNewProvenance(w http.ResponseWriter, r *http.Request) {
 			l.Error(err)
 			return
 		}
+	} else {
+		maxDegrees = 5
 	}
 	var res struct {
 		Status      string `json:"status,omitempty"`
