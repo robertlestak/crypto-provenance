@@ -18,6 +18,8 @@ spec:
       containers:
       - name: provenance
         image: registry.lestak.sh/humun-provenance:latest
+        args:
+        - server
         envFrom:
           - secretRef:
               name: provenance
