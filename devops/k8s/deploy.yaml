@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         app: provenance
+        humunapi: enabled
     spec:
       serviceAccount: provenance
       containers:
