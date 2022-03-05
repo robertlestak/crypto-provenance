@@ -1,0 +1,29 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: provenance
+  namespace: humun-core-crypto
+spec:
+  storageClassName: minio-data-nfs-provenance
+  capacity:
+    storage: 11.8Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: "yosemite.lestak.sh"
+    path: "/nfs/yosemite/servers/minio/data/humun-nft/provenance-test/"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: provenance
+  namespace: humun-core-crypto
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: "minio-data-nfs-provenance"
+  resources:
+    requests:
+      storage: 500Gi

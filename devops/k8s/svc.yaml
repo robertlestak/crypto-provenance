@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provenance
+  namespace: humun-core-crypto
+  labels:
+    app: provenance
+spec:
+  type: ClusterIP
+  selector:
+    app: provenance
+  ports:
+    - protocol: TCP
+      port: 80
+      name: http
+      targetPort: 80
+   

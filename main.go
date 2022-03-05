@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -22,6 +23,8 @@ var (
 	ml sync.Mutex
 
 	touchedAddrs []string
+
+	pendingQueue []schema.Provenance
 )
 
 type OutputBuilderResponse struct {
@@ -45,28 +48,37 @@ func txGetter(p schema.Provenance) error {
 		"func": "txGetter",
 	})
 	l.Info("start")
-	// TODO: this needs to be done in a loop until we get all txs
-	txs, err := getLatestTxs(p.Network, p.Address, 1, 10)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	var nt []schema.Transaction
-	if p.MaxDegrees > 0 && p.Level > p.MaxDegrees+1 {
-		l.Info("max degrees reached")
-		return nil
-	} else {
-		l.Debugf("max degrees: %d, level: %d", p.MaxDegrees, p.Level)
-	}
-	for _, tx := range txs {
-		lt := tx
-		lt.Level = p.Level + 1
-		nt = append(nt, lt)
-	}
+	var hasMore bool = true
+	var page int = 1
+	for hasMore {
+		// TODO: this needs to be done in a loop until we get all txs
+		txs, err := getLatestTxs(p.Network, p.Address, page, 1000)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		if len(txs) == 0 {
+			hasMore = false
+			break
+		}
+		var nt []schema.Transaction
+		if p.MaxDegrees > 0 && p.Level > p.MaxDegrees+1 {
+			l.Info("max degrees reached")
+			return nil
+		} else {
+			l.Debugf("max degrees: %d, level: %d", p.MaxDegrees, p.Level)
+		}
+		for _, tx := range txs {
+			lt := tx
+			lt.Level = p.Level + 1
+			nt = append(nt, lt)
+		}
 
-	if err := cache.AddTxs(p.RootAddress, p.Address, nt); err != nil {
-		log.Error(err)
-		return err
+		if err := cache.AddTxs(p.RootAddress, p.Address, nt); err != nil {
+			log.Error(err)
+			return err
+		}
+		page++
 	}
 	return nil
 }
@@ -436,7 +448,7 @@ func txworker(p schema.Provenance, level int) error {
 	})
 	l.Info("start")
 	outputDir := os.Getenv("OUTPUT_DIR")
-	outFile := fmt.Sprintf("%s/%s.csv", outputDir, p.RootAddress)
+	outFile := fmt.Sprintf("%s/%s_%s.csv", outputDir, p.Network, p.RootAddress)
 	if err := txGetter(p); err != nil {
 		l.Error(err)
 	}
@@ -469,6 +481,77 @@ func process(p schema.Provenance) {
 	}
 }
 
+func handleNewProvenance(w http.ResponseWriter, r *http.Request) {
+	l := log.WithFields(log.Fields{
+		"func": "handleNewProvenance",
+	})
+	l.Info("start")
+	var network string = r.FormValue("network")
+	var rootAddress string = r.FormValue("rootAddress")
+	var maxDegrees int
+	maxDegStr := r.FormValue("maxDegrees")
+	if maxDegStr != "" {
+		var err error
+		maxDegrees, err = strconv.Atoi(maxDegStr)
+		if err != nil {
+			l.Error(err)
+			return
+		}
+	}
+	if network == "" {
+		l.Error("network is required")
+		os.Exit(1)
+	}
+	if rootAddress == "" {
+		l.Error("rootAddress is required")
+		os.Exit(1)
+	}
+	p := schema.Provenance{
+		Network:     network,
+		RootAddress: rootAddress,
+		MaxDegrees:  maxDegrees,
+		Address:     rootAddress,
+	}
+	pendingQueue = append(pendingQueue, p)
+	fn := fmt.Sprintf("%s_%s.csv", network, rootAddress)
+	var res struct {
+		Status      string `json:"status"`
+		FileName    string `json:"fileName"`
+		QueueLength int    `json:"queueLength"`
+	}
+	res.Status = "pending"
+	res.FileName = fn
+	res.QueueLength = len(pendingQueue)
+	jd, err := json.Marshal(res)
+	if err != nil {
+		l.Error(err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jd)
+	//go process(p)
+}
+
+func serverQueueWorker() {
+	l := log.WithFields(log.Fields{
+		"func": "serverQueueWorker",
+	})
+	l.Info("start")
+	for {
+		time.Sleep(time.Second)
+		l.Debug("check pending queue")
+		if len(pendingQueue) > 0 {
+			l.Debugf("pending queue length: %d", len(pendingQueue))
+			p := pendingQueue[0]
+			// remove from queue
+			l.Debugf("remove from queue: %+v", p)
+			pendingQueue = pendingQueue[1:]
+			l.Debugf("process pending provenance: %+v", p)
+			process(p)
+		}
+	}
+}
+
 func server() error {
 	l := log.WithFields(log.Fields{
 		"func": "server",
@@ -478,8 +561,9 @@ func server() error {
 	if port == "" {
 		port = "8080"
 	}
+	go serverQueueWorker()
 	r := mux.NewRouter()
-	//r.HandleFunc("/ws", wsHandler).Methods("GET")
+	r.HandleFunc("/", handleNewProvenance).Methods("GET")
 	l.Infof("Listening on port %s", port)
 	c := cors.New(cors.Options{
 		AllowedOrigins:   strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), ","),

@@ -133,7 +133,7 @@ func GetPendingAddrsForRoot(rootAddress string) ([]string, error) {
 	var cursor uint64
 	var initCursor bool = true
 	for cursor > 0 || initCursor {
-		res := Client.Scan(cursor, key, 100)
+		res := Client.Scan(cursor, key, 1000)
 		if res.Err() != nil {
 			l.Error(res.Err())
 			return nil, res.Err()

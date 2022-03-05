@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provenance
+  namespace: humun-core-crypto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: provenance
+  template:
+    metadata:
+      labels:
+        app: provenance
+    spec:
+      serviceAccount: provenance
+      containers:
+      - name: provenance
+        image: registry.lestak.sh/humun-provenance
+        envFrom:
+          - secretRef:
+              name: provenance
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        resources:
+          limits:
+            memory: 2000Mi
+            cpu: 2000m
+          requests:
+            memory: 500Mi
+            cpu: 50m
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: provenance
