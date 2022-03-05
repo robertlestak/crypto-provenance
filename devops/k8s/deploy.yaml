@@ -17,7 +17,7 @@ spec:
       serviceAccount: provenance
       containers:
       - name: provenance
-        image: registry.lestak.sh/humun-provenance
+        image: registry.lestak.sh/humun-provenance:latest
         envFrom:
           - secretRef:
               name: provenance
