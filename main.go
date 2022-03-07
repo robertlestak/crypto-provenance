@@ -50,6 +50,15 @@ func txGetter(p schema.Provenance) error {
 	l.Info("start")
 	var hasMore bool = true
 	var page int = 1
+	var maxPage int
+	var err error
+	if os.Getenv("MAX_TX_PAGES") != "" {
+		maxPage, err = strconv.Atoi(os.Getenv("MAX_TX_PAGES"))
+		if err != nil {
+			l.Error(err)
+			return err
+		}
+	}
 	for hasMore {
 		// TODO: this needs to be done in a loop until we get all txs
 		txs, err := getLatestTxs(p.Network, p.Address, page, 1000)
@@ -79,6 +88,9 @@ func txGetter(p schema.Provenance) error {
 			return err
 		}
 		page++
+		if maxPage > 0 && page > maxPage {
+			hasMore = false
+		}
 	}
 	return nil
 }
