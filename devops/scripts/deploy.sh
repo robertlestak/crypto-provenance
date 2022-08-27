@@ -8,6 +8,6 @@ docker build -f Dockerfile \
     -t $IMAGE:$TAG \
     .
 
-docker push $IMAGE:$TAG
+#docker push $IMAGE:$TAG
 
-sed "s,$IMAGE:.*,$IMAGE:$TAG,g" devops/k8s/*.yaml | kubectl apply -f -
+#sed "s,$IMAGE:.*,$IMAGE:$TAG,g" devops/k8s/*.yaml | kubectl apply -f -
